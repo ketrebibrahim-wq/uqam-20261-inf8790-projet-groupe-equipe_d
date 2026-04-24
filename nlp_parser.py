@@ -30,3 +30,39 @@ def _detect_rooms(t: str) -> List[RoomId]:
         found.append(RoomId.ENTREE)
     return found if found else list(RoomId)
 
+def _detect_action(t: str) -> CommandAction:
+    # Commandes globales prioritaires
+    if _matches(t, "mode nuit", "bonne nuit", "dodo", "sleep", "nuit"):
+        return CommandAction.MODE_NIGHT
+    if _matches(t, "je rentre", "j arrive", "retour", "arrival", "bienvenue", "je suis la"):
+        return CommandAction.MODE_ARRIVAL
+    if _matches(t, "je pars", "mode absent", "away", "absent", "je sors", "quitter"):
+        return CommandAction.MODE_AWAY
+    if _matches(t, "etat", "resume", "status", "rapport", "quoi", "dis moi"):
+        return CommandAction.STATUS
+
+    # Alarme
+    if _matches(t, "alarme", "alerte", "feu", "urgence", "incendie", "fumee", "danger"):
+        return CommandAction.ALARM_ON
+    if _matches(t, "reset alarme", "annule alarme", "silence", "stop alarme", "eteins l alarme"):
+        return CommandAction.ALARM_OFF
+
+    # Chauffage
+    is_heat = _matches(t, "chauffage", "chauffe", "chaud")
+    is_on   = _matches(t, "allume", "allumez", "active", "activez", " on ", "ouvre", "marche", "demarre", "mets")  
+    is_off  = _matches(t, "eteins", "off", "coupe", "desactive", "ferme", "stop", "arrete")
+
+    if is_heat and is_on:  return CommandAction.HEATING_ON
+    if is_heat and is_off: return CommandAction.HEATING_OFF
+    if is_on:              return CommandAction.LIGHTS_ON
+    if is_off:             return CommandAction.LIGHTS_OFF
+
+    return CommandAction.UNKNOWN
+
+
+def parse(input_text: str) -> ParsedCommand:
+    t = _normalize(input_text)
+    rooms  = _detect_rooms(t)
+    action = _detect_action(t)
+    return ParsedCommand(rooms=rooms, action=action, raw=input_text)
+

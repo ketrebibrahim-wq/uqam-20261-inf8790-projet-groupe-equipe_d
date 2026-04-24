@@ -66,3 +66,28 @@ def parse(input_text: str) -> ParsedCommand:
     action = _detect_action(t)
     return ParsedCommand(rooms=rooms, action=action, raw=input_text)
 
+def generate_reply(cmd: ParsedCommand, executed_rooms: List[str]) -> str:
+    rooms = ", ".join(executed_rooms)
+    replies = {
+        CommandAction.LIGHTS_ON:    f"Lumières allumées : {rooms} 💡",
+        CommandAction.LIGHTS_OFF:   f"Lumières éteintes : {rooms} 🔦",
+        CommandAction.HEATING_ON:   f"Chauffage activé : {rooms} 🔥",
+        CommandAction.HEATING_OFF:  f"Chauffage coupé : {rooms} ❄️",
+        CommandAction.ALARM_ON:     "🚨 Alarme déclenchée ! Chauffage coupé par sécurité.",
+        CommandAction.ALARM_OFF:    "Alarme réinitialisée. Maison sécurisée. ✅",
+        CommandAction.MODE_NIGHT:   "Mode nuit activé. Lumières éteintes, chambre chauffée. Bonne nuit ! 🌙",
+        CommandAction.MODE_ARRIVAL: "Bienvenue ! Entrée et salon allumés, chauffage activé. 👋",
+        CommandAction.MODE_AWAY:    "Mode absent activé. Tout éteint, je surveille la maison. 🚪",
+        CommandAction.STATUS:       "Je génère le rapport de la maison...",
+        CommandAction.UNKNOWN:      'Commande non reconnue. Dis par exemple :\n"allume le salon", "mode nuit", "état de la maison".',
+    }
+    return replies.get(cmd.action, replies[CommandAction.UNKNOWN])
+
+
+def generate_access_denied(attempt: int) -> str:
+    return (
+        f"⛔ ACCÈS REFUSÉ\n\n"
+        f"Voix non reconnue. Tentative #{attempt} enregistrée.\n"
+        f"Alarme déclenchée. Propriétaire notifié."
+    )
+

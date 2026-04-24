@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartNest AI</title>
+<style>
+  :root {
+    --bg:        #0d0f14;
+    --surface:   #141720;
+    --border:    #1e2130;
+    --text:      #e8eaf0;
+    --text-dim:  #6b7280;
+    --indigo:    #6366f1;
+    --indigo-dk: #4f46e5;
+    --green:     #22c55e;
+    --orange:    #f59e0b;
+    --red:       #ef4444;
+    --cyan:      #06b6d4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; }
+
+  /* ── Layout ─── */
+  .app { display: flex; flex-direction: column; height: 100vh; max-width: 1200px; margin: 0 auto; }
+  header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  header h1 { font-size: 18px; font-weight: 700; color: var(--indigo); }
+  header span { font-size: 11px; color: var(--text-dim); }
+  .tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .tab { flex: 1; padding: 10px 4px; text-align: center; cursor: pointer; font-size: 12px; color: var(--text-dim); border: none; background: none; transition: color .2s; }
+  .tab.active { color: var(--indigo); border-bottom: 2px solid var(--indigo); }
+  .tab:hover { color: var(--text); }
+  .content { flex: 1; overflow-y: auto; padding: 12px; }
+  .pane { display: none; }
+  .pane.active { display: block; }
+
+  /* ── Cards ─── */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+  .card-title { font-size: 12px; color: var(--text-dim); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .5px; }
+
+  /* ── Room grid ─── */
+  .rooms-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .room-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; position: relative; }
+  .room-card.alert { border-color: var(--red); }
+  .room-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .room-name { font-weight: 600; font-size: 15px; }
+  .badge { font-size: 10px; padding: 2px 6px; border-radius: 99px; }
+  .badge-ai     { background: #1e2130; color: var(--indigo); }
+  .badge-manual { background: #2a1a00; color: var(--orange); }
+  .sensors { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .chip { font-size: 11px; padding: 2px 7px; border-radius: 99px; background: var(--border); color: var(--text-dim); }
+  .chip.on { background: #1a2a1a; color: var(--green); }
+  .chip.alert { background: #2a1010; color: var(--red); }
+  .controls { display: flex; gap: 6px; flex-wrap: wrap; }
+  .btn-sm { font-size: 11px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; transition: background .15s; }
+  .btn-sm:hover { background: var(--border); }
+  .btn-sm.active { background: var(--indigo); border-color: var(--indigo); color: #fff; }
+  .btn-sm.danger.active { background: var(--red); border-color: var(--red); }
+  .btn-sm.heat.active { background: var(--orange); border-color: var(--orange); color: #000; }
+
+  /* ── Scenario row ─── */
+  .scenario-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+  .scenario-btn { font-size: 12px; padding: 5px 12px; border-radius: 99px; border: 1px solid var(--border); background: var(--bg); color: var(--text-dim); cursor: pointer; }
+  .scenario-btn.active { border-color: var(--indigo); color: var(--indigo); background: #1a1c2e; }
+
+  /* ── Sim button ─── */
+  .sim-btn { padding: 8px 20px; border-radius: 10px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; transition: background .15s; }
+  .sim-btn.off { background: var(--indigo); color: #fff; }
+  .sim-btn.on  { background: var(--red);    color: #fff; }
+
+  /* ── Log ─── */
+  .log { max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+  .log-entry { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; padding: 4px 6px; border-radius: 6px; }
+  .log-ts   { color: var(--text-dim); white-space: nowrap; font-size: 11px; }
+  .log-src  { color: var(--cyan); white-space: nowrap; }
+  .log-msg  { color: var(--text); flex: 1; }
+  .log-entry.INFO     { background: transparent; }
+  .log-entry.SUCCESS  { background: #0f1f0f; }
+  .log-entry.WARNING  { background: #1f1a00; }
+  .log-entry.DANGER   { background: #1f0808; }
+  .log-entry.MANUAL   { background: #1a1000; }
+  .log-entry.SECURITY { background: #1a0a1a; }
+
+  /* ── Chat ─── */
+  .chat-messages { max-height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+  .bubble { max-width: 80%; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.4; white-space: pre-wrap; }
+  .bubble.ai     { background: var(--surface); border: 1px solid var(--border); align-self: flex-start; }
+  .bubble.owner  { background: var(--indigo);  color: #fff; align-self: flex-end; }
+  .bubble.intruder { background: #3a1010; border: 1px solid var(--red); align-self: flex-end; }
+  .bubble.system { background: var(--border);  align-self: center; font-size: 11px; color: var(--text-dim); }
+  .action-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .action-tag { font-size: 10px; padding: 2px 7px; border-radius: 99px; background: var(--border); }
+  .action-tag.ON     { background: #1a2a1a; color: var(--green); }
+  .action-tag.OFF    { background: #1e1e1e; color: var(--text-dim); }
+  .action-tag.HEAT   { background: #2a1a00; color: var(--orange); }
+  .action-tag.ALARM  { background: #2a0000; color: var(--red); }
+  .action-tag.RESET  { background: #0f1f0f; color: var(--green); }
+  .action-tag.DENIED { background: #2a0000; color: var(--red); }
+  .chat-input { display: flex; gap: 8px; }
+  .chat-input input { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text); font-size: 13px; }
+  .chat-input input:focus { outline: none; border-color: var(--indigo); }
+  .send-btn { padding: 8px 16px; background: var(--indigo); color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 13px; }
+  .send-btn:hover { background: var(--indigo-dk); }
+
+  /* ── Cameras ─── */
+  .cameras-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .camera-cell { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+  .camera-preview { background: #090b10; border-radius: 8px; height: 120px; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; position: relative; overflow: hidden; }
+  .camera-emoji { font-size: 36px; opacity: .4; }
+  .motion-badge { position: absolute; top: 6px; right: 6px; background: var(--red); color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px; }
+  .rec-badge    { position: absolute; top: 6px; left: 6px; background: var(--red); color: #fff; font-size: 9px; padding: 2px 6px; border-radius: 99px; animation: blink 1s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+  .scan-line { position: absolute; width: 100%; height: 2px; background: linear-gradient(90deg,transparent,var(--green),transparent); opacity: 0.6; animation: scan 3s linear infinite; }
+  @keyframes scan { 0%{top:0} 100%{top:100%} }
+
+  /* ── Security ─── */
+  .role-btns { display: flex; gap: 8px; margin-bottom: 10px; }
+  .role-btn { flex: 1; padding: 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; font-size: 13px; }
+  .role-btn.owner.active    { background: var(--indigo); border-color: var(--indigo); color: #fff; }
+  .role-btn.intruder.active { background: var(--red);    border-color: var(--red);    color: #fff; }
+
+  /* ── Global controls ─── */
+  .global-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .g-btn { padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; font-size: 12px; }
+  .g-btn:hover { background: var(--border); }
+
+  /* ── Responsive ─── */
+  @media (max-width: 600px) {
+    .rooms-grid, .cameras-grid { grid-template-columns: 1fr; }
+  }
+
+  /* ── Scrollbar ─── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header>
+    <span style="font-size:22px">🏠</span>
+    <div>
+      <h1>SmartNest AI</h1>
+      <span id="sim-status">Simulation arrêtée</span>
+    </div>
+  </header>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-tab="demo">🤖 Démo IA</button>
+    <button class="tab" data-tab="command">💬 Commande</button>
+    <button class="tab" data-tab="cameras">📹 Caméras</button>
+    <button class="tab" data-tab="security">🔐 Sécurité</button>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- ── DÉMO IA ── -->
+    <div id="pane-demo" class="pane active">
+
+      <div class="card">
+        <div class="card-title">Contrôle simulation</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button id="sim-btn" class="sim-btn off" onclick="toggleSim()">▶ Démarrer</button>
+          <button class="g-btn" onclick="clearLog()">🗑 Vider journal</button>
+          <button class="g-btn" onclick="resetAll()">↺ Réinitialiser</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Scénario IA</div>
+        <div class="scenario-row" id="scenario-row">
+          <button class="scenario-btn active" data-sc="NORMAL"      onclick="setScenario(this)">✅ Normal</button>
+          <button class="scenario-btn"        data-sc="NIGHT"       onclick="setScenario(this)">🌙 Mode nuit</button>
+          <button class="scenario-btn"        data-sc="SMOKE_ALERT" onclick="setScenario(this)">🚨 Alerte fumée</button>
+          <button class="scenario-btn"        data-sc="ARRIVAL"     onclick="setScenario(this)">👤 Arrivée</button>
+          <button class="scenario-btn"        data-sc="INTRUSION"   onclick="setScenario(this)">🔓 Intrusion</button>
+        </div>
+      </div>
+
+      <div class="global-row">
+        <button class="g-btn" onclick="apiPost('/api/rooms/release-all')">🤖 Tout → IA</button>
+        <button class="g-btn" onclick="apiPost('/api/alarms/reset')">🔕 Reset alarmes</button>
+      </div>
+
+      <div class="rooms-grid" id="rooms-grid"></div>
+
+      <div class="card" style="margin-top:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span class="card-title" style="margin:0">Journal IA</span>
+          <span id="log-count" style="font-size:11px;color:var(--text-dim)"></span>
+        </div>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+
+    <!-- ── COMMANDE ── -->
+    <div id="pane-command" class="pane">
+      <div class="card">
+        <div class="card-title">Assistant vocal / texte</div>
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-input">
+          <input id="cmd-input" type="text" placeholder='Ex: "allume le salon", "mode nuit", "état"…'
+                 onkeydown="if(event.key==='Enter') sendCommand()">
+          <button id="mic-btn" class="send-btn" onclick="toggleMic()" style="background:#374151"></button>
+          <button class="send-btn" onclick="sendCommand()">Envoyer</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Suggestions</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <button class="btn-sm" onclick="quickCmd('allume tout')">💡 Allume tout</button>
+          <button class="btn-sm" onclick="quickCmd('éteins tout')">🔦 Éteins tout</button>
+          <button class="btn-sm" onclick="quickCmd('chauffage on')">🔥 Chauf. ON</button>
+          <button class="btn-sm" onclick="quickCmd('mode nuit')">🌙 Nuit</button>
+          <button class="btn-sm" onclick="quickCmd('je rentre')">👤 Arrivée</button>
+          <button class="btn-sm" onclick="quickCmd('je pars')">🚪 Absent</button>
+          <button class="btn-sm" onclick="quickCmd('état de la maison')">📊 État</button>
+          <button class="btn-sm" onclick="quickCmd('alarme')">🚨 Alarme</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── CAMÉRAS ── -->
+    <div id="pane-cameras" class="pane">
+      <div class="cameras-grid" id="cameras-grid"></div>
+    </div>
+
+    <!-- ── SÉCURITÉ ── -->
+    <div id="pane-security" class="pane">
+      <div class="card">
+        <div class="card-title">Rôle utilisateur</div>
+        <div class="role-btns">
+          <button id="role-owner"    class="role-btn owner active"    onclick="setRole('OWNER')">👑 Propriétaire</button>
+          <button id="role-intruder" class="role-btn intruder"         onclick="setRole('INTRUDER')">🕵️ Intrus</button>
+        </div>
+        <div id="intrusion-banner" style="display:none;background:#2a0808;border:1px solid var(--red);border-radius:8px;padding:8px;font-size:12px;margin-bottom:8px">
+          🚨 <span id="intrusion-count-text"></span>
+        </div>
+        <div class="chat-messages" id="sec-messages"></div>
+        <div class="chat-input">
+          <input id="sec-input" type="text" placeholder="Envoie une commande sécurité…"
+                 onkeydown="if(event.key==='Enter') sendSecCommand()">
+          <button class="send-btn" onclick="sendSecCommand()">Envoyer</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Journal sécurité</div>
+        <div class="log" id="sec-log"></div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /app -->
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let _state = {};
+let _pollTimer = null;
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('pane-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ── Polling ──────────────────────────────────────────────────────────────────
+async function poll() {
+  try {
+    const r = await fetch('/api/state');
+    _state = await r.json();
+    renderAll();
+  } catch(e) {}
+  _pollTimer = setTimeout(poll, 800);
+}
+
+function renderAll() {
+  renderSimBtn();
+  renderRooms();
+  renderLog();
+  renderChat();
+  renderCameras();
+  renderSecLog();
+  renderSecChat();
+}
+
+// ── Simulation btn ────────────────────────────────────────────────────────────
+function renderSimBtn() {
+  const btn = document.getElementById('sim-btn');
+  const status = document.getElementById('sim-status');
+  if (_state.is_simulating) {
+    btn.textContent = '⏹ Arrêter';
+    btn.className = 'sim-btn on';
+    status.textContent = 'Simulation en cours…';
+    status.style.color = 'var(--green)';
+  } else {
+    btn.textContent = '▶ Démarrer';
+    btn.className = 'sim-btn off';
+    status.textContent = 'Simulation arrêtée';
+    status.style.color = 'var(--text-dim)';
+  }
+}
+
+// ── Rooms ────────────────────────────────────────────────────────────────────
+function renderRooms() {
+  if (!_state.rooms) return;
+  const grid = document.getElementById('rooms-grid');
+  grid.innerHTML = _state.rooms.map(r => `
+    <div class="room-card ${r.has_alert ? 'alert' : ''}">
+      <div class="room-header">
+        <span class="room-name">${r.emoji} ${r.label}</span>
+        <span class="badge ${r.control_mode === 'AI' ? 'badge-ai' : 'badge-manual'}">
+          ${r.control_mode === 'AI' ? '🤖 IA' : '✋ Manuel'}
+        </span>
+      </div>
+      <div class="sensors">
+        <span class="chip">🌡️ ${r.temperature}°C</span>
+        <span class="chip">☀️ ${r.luminosity} lx</span>
+        ${r.presence ? '<span class="chip on">👤 Présent</span>' : '<span class="chip">👻 Vide</span>'}
+        ${r.smoke > 20 ? `<span class="chip alert">💨 ${r.smoke} ppm</span>` : ''}
+      </div>
+      <div class="controls">
+        <button class="btn-sm ${r.lights_on ? 'active' : ''}"
+                onclick="apiPost('/api/room/${r.id}/light')">
+          ${r.lights_on ? '💡 Lumière' : '🔦 Lumière'}
+        </button>
+        <button class="btn-sm heat ${r.heating_on ? 'active' : ''}"
+                onclick="apiPost('/api/room/${r.id}/heating')">
+          ${r.heating_on ? '🔥 Chauff.' : '❄️ Chauff.'}
+        </button>
+        <button class="btn-sm danger ${r.alarm_on ? 'active' : ''}"
+                onclick="apiPost('/api/room/${r.id}/alarm')">
+          ${r.alarm_on ? '🚨 Alarme' : '🔕 Alarme'}
+        </button>
+        ${r.control_mode === 'MANUAL' ?
+          `<button class="btn-sm" onclick="apiPost('/api/room/${r.id}/release')">🤖 IA</button>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Log ───────────────────────────────────────────────────────────────────────
+function renderLog() {
+  if (!_state.decisions) return;
+  const el = document.getElementById('log');
+  document.getElementById('log-count').textContent = `${_state.decisions.length} entrées`;
+  el.innerHTML = _state.decisions.slice(0, 40).map(d => `
+    <div class="log-entry ${d.level}">
+      <span class="log-ts">${d.timestamp}</span>
+      <span class="log-src">${d.source}</span>
+      <span class="log-msg">${d.message}</span>
+    </div>
+  `).join('');
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+function renderChat() {
+  if (!_state.chat_history) return;
+  const el = document.getElementById('chat-messages');
+  const atBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 50;
+  el.innerHTML = _state.chat_history.map(m => bubbleHtml(m)).join('');
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+function bubbleHtml(m) {
+  const cls = m.role === 'AI' ? 'ai' : m.role === 'USER_OWNER' ? 'owner' : m.role === 'USER_INTRUDER' ? 'intruder' : 'system';
+  const tags = (m.actions || []).map(a => `<span class="action-tag ${a.type}">${a.label}</span>`).join('');
+  return `<div class="bubble ${cls}">${m.text}${tags ? `<div class="action-tags">${tags}</div>` : ''}</div>`;
+}
+
+// ── Cameras ──────────────────────────────────────────────────────────────────
+function renderCameras() {
+  if (!_state.camera_feeds) return;
+  const grid = document.getElementById('cameras-grid');
+  grid.innerHTML = _state.camera_feeds.map(c => `
+    <div class="camera-cell">
+      <div class="camera-preview">
+        <div class="scan-line"></div>
+        <span class="camera-emoji">${c.emoji}</span>
+        ${c.motion_detected ? '<span class="motion-badge">MOUVEMENT</span>' : ''}
+        ${c.recording_active ? '<span class="rec-badge">● REC</span>' : ''}
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:13px;font-weight:600">${c.label}</span>
+        <span style="font-size:11px;color:var(--green)">● Actif</span>
+      </div>
+      <div style="font-size:11px;color:var(--text-dim);margin-top:4px">
+        ${c.motion_detected ? '🟡 Mouvement détecté' : '⚫ Pas de mouvement'}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Security ─────────────────────────────────────────────────────────────────
+function renderSecLog() {
+  if (!_state.security_events) return;
+  const el = document.getElementById('sec-log');
+  const typeColor = { AUTH_OK: 'SUCCESS', INTRUSION_ATTEMPT: 'DANGER', ALARM_TRIGGERED: 'DANGER', ALARM_RESET: 'SUCCESS' };
+  el.innerHTML = _state.security_events.map(e => `
+    <div class="log-entry ${typeColor[e.type] || 'INFO'}">
+      <span class="log-ts">${e.timestamp}</span>
+      <span class="log-src">${e.type}</span>
+      <span class="log-msg">${e.description}</span>
+    </div>
+  `).join('');
+}
+
+function renderSecChat() {
+  if (!_state.sec_chat) return;
+  const el = document.getElementById('sec-messages');
+  const atBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 50;
+  el.innerHTML = _state.sec_chat.map(m => bubbleHtml(m)).join('');
+  if (atBottom) el.scrollTop = el.scrollHeight;
+
+  const cnt = _state.intrusion_count;
+  const banner = document.getElementById('intrusion-banner');
+  if (cnt > 0) {
+    banner.style.display = 'block';
+    document.getElementById('intrusion-count-text').textContent =
+      `${cnt} tentative${cnt > 1 ? 's' : ''} d'intrusion détectée${cnt > 1 ? 's' : ''}`;
+  }
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+async function toggleSim() {
+  await apiPost('/api/simulation/toggle');
+}
+
+async function setScenario(btn) {
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  await apiPost('/api/scenario', { scenario: btn.dataset.sc });
+}
+
+async function sendCommand() {
+  const input = document.getElementById('cmd-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  await apiPost('/api/command', { text });
+}
+
+function quickCmd(text) {
+  document.getElementById('cmd-input').value = text;
+  sendCommand();
+}
+
+async function sendSecCommand() {
+  const input = document.getElementById('sec-input');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  await apiPost('/api/security/command', { text });
+}
+
+async function setRole(role) {
+  await apiPost('/api/security/role', { role });
+  document.getElementById('role-owner').classList.toggle('active', role === 'OWNER');
+  document.getElementById('role-intruder').classList.toggle('active', role === 'INTRUDER');
+}
+
+async function clearLog() { await apiPost('/api/log/clear'); }
+async function resetAll()  { await apiPost('/api/reset'); }
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+async function apiPost(url, body = {}) {
+  try {
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch(e) {}
+}
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+poll();
+// ── Reconnaissance vocale ─────────────────────────────────────────────────
+let _recognition = null;
+
+function toggleMic() {
+  const btn = document.getElementById('mic-btn');
+  if (!('webkitSpeechRecognition' in window)) {
+    alert('Utilise Chrome pour la reconnaissance vocale !');
+    return;
+  }
+  if (_recognition) {
+    _recognition.stop();
+    _recognition = null;
+    btn.textContent = '🎤';
+    btn.style.background = '#374151';
+    return;
+  }
+  _recognition = new webkitSpeechRecognition();
+  _recognition.lang = 'fr-FR';
+  _recognition.continuous = false;
+  _recognition.interimResults = false;
+  btn.textContent = '🔴';
+  btn.style.background = '#ef4444';
+  _recognition.onresult = (e) => {
+    const text = e.results[0][0].transcript;
+    document.getElementById('cmd-input').value = text;
+    sendCommand();
+  };
+  _recognition.onend = () => {
+    btn.textContent = '🎤';
+    btn.style.background = '#374151';
+    _recognition = null;
+  };
+  _recognition.start();
+}
+</script>
+</body>
+</html>

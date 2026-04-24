@@ -91,3 +91,17 @@ def generate_access_denied(attempt: int) -> str:
         f"Alarme déclenchée. Propriétaire notifié."
     )
 
+def build_action_tags(cmd: ParsedCommand, rooms: List[str]) -> List[ActionTag]:
+    room_str = ", ".join(rooms[:2])
+    tag_map = {
+        CommandAction.LIGHTS_ON:    [ActionTag(f"💡 Lumière ON — {room_str}",  ActionType.ON)],
+        CommandAction.LIGHTS_OFF:   [ActionTag(f"🔦 Lumière OFF — {room_str}", ActionType.OFF)],
+        CommandAction.HEATING_ON:   [ActionTag(f"🔥 Chauf. ON — {room_str}",  ActionType.HEAT)],
+        CommandAction.HEATING_OFF:  [ActionTag(f"❄️ Chauf. OFF — {room_str}", ActionType.OFF)],
+        CommandAction.ALARM_ON:     [ActionTag("🚨 ALARME", ActionType.ALARM)],
+        CommandAction.ALARM_OFF:    [ActionTag("🔕 Alarme reset", ActionType.RESET)],
+        CommandAction.MODE_NIGHT:   [ActionTag("🌙 Mode nuit", ActionType.OFF)],
+        CommandAction.MODE_ARRIVAL: [ActionTag("💡 Accueil", ActionType.ON), ActionTag("🔥 Chauffage", ActionType.HEAT)],
+        CommandAction.MODE_AWAY:    [ActionTag("🚪 Absent", ActionType.OFF)],
+    }
+    return tag_map.get(cmd.action, [])

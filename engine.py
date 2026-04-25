@@ -19,6 +19,8 @@ from models import (
 
 def _ts() -> str:
     return datetime.now().strftime("%H:%M:%S")
+
+
 class SmartHomeEngine:
     def __init__(self):
         self._lock      = threading.Lock()
@@ -29,7 +31,8 @@ class SmartHomeEngine:
         self.scenario   = Scenario.NORMAL
         self.is_running = False
         self._cycle     = 0
-  # ── Accesseurs thread-safe ────────────────────────────────────────────────
+
+    # ── Accesseurs thread-safe ────────────────────────────────────────────────
     @property
     def rooms(self) -> List[Room]:
         with self._lock:
@@ -230,7 +233,8 @@ class SmartHomeEngine:
                 new_rooms.append(room)
             self._rooms = new_rooms
         return affected
-     # ── Contrôles manuels ─────────────────────────────────────────────────────
+
+    # ── Contrôles manuels ─────────────────────────────────────────────────────
     def set_light(self, room_id: RoomId, on: bool):
         self._update_room(room_id, lambda r: Room(**{**r.__dict__, "lights_on": on, "control_mode": ControlMode.MANUAL}))
 
@@ -290,4 +294,3 @@ class SmartHomeEngine:
             lines.append(f"🚨 Alarmes : {alarms}")
         lines.append(f"🌡️ {temps}")
         return "\n".join(lines)
-

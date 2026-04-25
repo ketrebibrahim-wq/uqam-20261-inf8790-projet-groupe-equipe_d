@@ -99,12 +99,12 @@ jobs:
 
           engine.set_light(RoomId.SALON, True)
           salon = next(r for r in engine.rooms if r.id == RoomId.SALON)
-          assert salon.light == True
+          assert salon.lights_on == True
           print('✅ set_light(SALON, True) fonctionne')
 
           engine.set_heating(RoomId.CUISINE, True)
           cuisine = next(r for r in engine.rooms if r.id == RoomId.CUISINE)
-          assert cuisine.heating == True
+          assert cuisine.heating_on == True
           print('✅ set_heating(CUISINE, True) fonctionne')
 
           engine.reset_alarms()

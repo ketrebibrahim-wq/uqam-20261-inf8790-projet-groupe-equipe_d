@@ -19,3 +19,13 @@ from models import (
 
 def _ts() -> str:
     return datetime.now().strftime("%H:%M:%S")
+class SmartHomeEngine:
+    def __init__(self):
+        self._lock      = threading.Lock()
+        self._rooms     = self._initial_rooms()
+        self._decisions: List[AIDecision]    = []
+        self._sec_events: List[SecurityEvent] = []
+        self._cameras   = self._initial_cameras()
+        self.scenario   = Scenario.NORMAL
+        self.is_running = False
+        self._cycle     = 0

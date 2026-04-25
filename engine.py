@@ -230,3 +230,64 @@ class SmartHomeEngine:
                 new_rooms.append(room)
             self._rooms = new_rooms
         return affected
+     # ── Contrôles manuels ─────────────────────────────────────────────────────
+    def set_light(self, room_id: RoomId, on: bool):
+        self._update_room(room_id, lambda r: Room(**{**r.__dict__, "lights_on": on, "control_mode": ControlMode.MANUAL}))
+
+    def set_heating(self, room_id: RoomId, on: bool):
+        self._update_room(room_id, lambda r: Room(**{**r.__dict__, "heating_on": on, "control_mode": ControlMode.MANUAL}))
+
+    def set_alarm(self, room_id: RoomId, on: bool):
+        self._update_room(room_id, lambda r: Room(**{**r.__dict__, "alarm_on": on}))
+
+    def release_to_ai(self, room_id: RoomId):
+        self._update_room(room_id, lambda r: Room(**{**r.__dict__, "control_mode": ControlMode.AI}))
+
+    def release_all_to_ai(self):
+        with self._lock:
+            self._rooms = [Room(**{**r.__dict__, "control_mode": ControlMode.AI}) for r in self._rooms]
+
+    def _update_room(self, room_id: RoomId, transform):
+        with self._lock:
+            self._rooms = [transform(r) if r.id == room_id else r for r in self._rooms]
+
+    # ── Journal ───────────────────────────────────────────────────────────────
+    def add_decision(self, source: str, message: str, level: DecisionLevel):
+        d = AIDecision(timestamp=_ts(), source=source, message=message, level=level)
+        with self._lock:
+            self._decisions = ([d] + self._decisions)[:60]
+
+    def add_security_event(self, event_type: SecurityEventType, desc: str):
+        e = SecurityEvent(timestamp=_ts(), type=event_type, description=desc)
+        with self._lock:
+            self._sec_events = ([e] + self._sec_events)[:30]
+
+    def clear_log(self):
+        with self._lock:
+            self._decisions = []
+
+    def reset_alarms(self):
+        with self._lock:
+            self._rooms = [Room(**{**r.__dict__, "alarm_on": False}) for r in self._rooms]
+
+    def reset_all(self):
+        with self._lock:
+            self._rooms = self._initial_rooms()
+            self._decisions = []
+
+    def build_status_report(self) -> str:
+        r = self.rooms
+        lits   = ", ".join(x.label for x in r if x.lights_on)  or "Aucune"
+        heats  = ", ".join(x.label for x in r if x.heating_on) or "Aucun"
+        alarms = ", ".join(x.label for x in r if x.alarm_on)
+        temps  = " | ".join(f"{x.label} {x.temperature}°C" for x in r)
+        lines  = [
+            "📊 **Rapport maison :**",
+            f"💡 Lumières : {lits}",
+            f"🔥 Chauffage : {heats}",
+        ]
+        if alarms:
+            lines.append(f"🚨 Alarmes : {alarms}")
+        lines.append(f"🌡️ {temps}")
+        return "\n".join(lines)
+

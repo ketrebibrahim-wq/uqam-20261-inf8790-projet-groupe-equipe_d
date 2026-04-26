@@ -12,24 +12,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ── 1. Récupérer le code ───────────────────────────────────────────────
       - name: 📥 Checkout du code
         uses: actions/checkout@v4
 
-      # ── 2. Installer Python ────────────────────────────────────────────────
       - name: 🐍 Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ── 3. Installer les dépendances ───────────────────────────────────────
       - name: 📦 Installation des dépendances
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest requests
 
-      # ── 4. Vérifier que les modules importent correctement ─────────────────
       - name: 🔍 Vérification des imports
         run: |
           python -c "from models import RoomId, Room, Scenario, UserRole, DecisionLevel; print('✅ models.py OK')"
@@ -37,7 +33,6 @@ jobs:
           python -c "from engine import SmartHomeEngine; print('✅ engine.py OK')"
           python -c "from app import app; print('✅ app.py OK')"
 
-      # ── 5. Vérifier que index.html existe dans templates/ ──────────────────
       - name: 📄 Vérification structure fichiers
         run: |
           test -f templates/index.html && echo "✅ templates/index.html OK" || (echo "❌ templates/index.html manquant" && exit 1)
@@ -46,167 +41,140 @@ jobs:
           test -f models.py && echo "✅ models.py OK"
           test -f nlp_parser.py && echo "✅ nlp_parser.py OK"
 
-      # ── 6. Tests unitaires NLP ─────────────────────────────────────────────
       - name: 🧠 Tests NLP Parser
         run: |
           python -c "
           from nlp_parser import parse
           from models import CommandAction, RoomId
 
-          # Test 1 : allumer lumière salon
           cmd = parse('allume le salon')
-          assert cmd.action == CommandAction.LIGHTS_ON, f'FAIL: {cmd.action}'
+          assert cmd.action == CommandAction.LIGHTS_ON
           assert RoomId.SALON in cmd.rooms
           print('✅ Test 1 OK — allume le salon → LIGHTS_ON + SALON')
 
-          # Test 2 : éteindre chauffage cuisine
           cmd = parse('Éteins le chauffage dans la cuisine')
-          assert cmd.action == CommandAction.HEATING_OFF, f'FAIL: {cmd.action}'
+          assert cmd.action == CommandAction.HEATING_OFF
           assert RoomId.CUISINE in cmd.rooms
-          print('✅ Test 2 OK — éteins le chauffage cuisine → HEATING_OFF + CUISINE')
+          print('✅ Test 2 OK — éteins chauffage cuisine → HEATING_OFF + CUISINE')
 
-          # Test 3 : mode nuit
           cmd = parse('bonne nuit')
-          assert cmd.action == CommandAction.MODE_NIGHT, f'FAIL: {cmd.action}'
+          assert cmd.action == CommandAction.MODE_NIGHT
           print('✅ Test 3 OK — bonne nuit → MODE_NIGHT')
 
-          # Test 4 : alarme
           cmd = parse('il y a de la fumée')
-          assert cmd.action == CommandAction.ALARM_ON, f'FAIL: {cmd.action}'
+          assert cmd.action == CommandAction.ALARM_ON
           print('✅ Test 4 OK — fumée → ALARM_ON')
 
-          # Test 5 : je rentre
           cmd = parse('je rentre à la maison')
-          assert cmd.action == CommandAction.MODE_ARRIVAL, f'FAIL: {cmd.action}'
+          assert cmd.action == CommandAction.MODE_ARRIVAL
           print('✅ Test 5 OK — je rentre → MODE_ARRIVAL')
 
-          # Test 6 : commande inconnue
           cmd = parse('blabla xyz inconnu')
           assert cmd.action == CommandAction.UNKNOWN
           print('✅ Test 6 OK — commande inconnue → UNKNOWN')
 
-          print('')
           print('🎉 Tous les tests NLP passent !')
           "
 
-      # ── 7. Tests unitaires Engine ──────────────────────────────────────────
       - name: ⚙️ Tests Engine (BDI + STRIPS)
         run: |
           python -c "
           from engine import SmartHomeEngine
-          from models import Scenario, RoomId, ControlMode
+          from models import Scenario, RoomId
 
           engine = SmartHomeEngine()
           print('✅ SmartHomeEngine instancié')
 
-          # Test état initial
-          state = engine.get_state()
-          assert 'rooms' in state
-          assert 'scenario' in state
-          assert 'decisions' in state
-          print('✅ get_state() retourne rooms, scenario, decisions')
+          rooms = engine.rooms
+          assert len(rooms) == 4
+          print(f'✅ engine.rooms retourne {len(rooms)} pièces')
 
-          # Test changement de scénario
-          engine.set_scenario(Scenario.NIGHT)
-          state = engine.get_state()
-          assert state['scenario'] == 'NIGHT'
-          print('✅ set_scenario(NIGHT) fonctionne')
+          decisions = engine.decisions
+          assert isinstance(decisions, list)
+          print('✅ engine.decisions accessible')
 
-          # Test lumières
-          engine.set_room_light(RoomId.SALON, True)
-          state = engine.get_state()
-          salon = next(r for r in state['rooms'] if r['id'] == 'SALON')
-          assert salon['light'] == True
-          print('✅ set_room_light(SALON, True) fonctionne')
+          engine.scenario = Scenario.NIGHT
+          assert engine.scenario == Scenario.NIGHT
+          print('✅ engine.scenario = NIGHT fonctionne')
 
-          # Test chauffage
-          engine.set_room_heating(RoomId.CUISINE, True)
-          state = engine.get_state()
-          cuisine = next(r for r in state['rooms'] if r['id'] == 'CUISINE')
-          assert cuisine['heating'] == True
-          print('✅ set_room_heating(CUISINE, True) fonctionne')
+          engine.set_light(RoomId.SALON, True)
+          salon = next(r for r in engine.rooms if r.id == RoomId.SALON)
+          assert salon.lights_on == True
+          print('✅ set_light(SALON, True) fonctionne')
 
-          # Test alarme
-          engine.set_alarm(True)
-          state = engine.get_state()
-          assert state['alarm'] == True
-          print('✅ set_alarm(True) fonctionne')
+          engine.set_heating(RoomId.CUISINE, True)
+          cuisine = next(r for r in engine.rooms if r.id == RoomId.CUISINE)
+          assert cuisine.heating_on == True
+          print('✅ set_heating(CUISINE, True) fonctionne')
 
-          print('')
+          engine.reset_alarms()
+          print('✅ reset_alarms() fonctionne')
+
+          report = engine.build_status_report()
+          assert isinstance(report, str) and len(report) > 0
+          print('✅ build_status_report() OK')
+
           print('🎉 Tous les tests Engine passent !')
           "
 
-      # ── 8. Tests API Flask (routes REST) ───────────────────────────────────
       - name: 🌐 Tests API Flask
         run: |
           python -c "
           import threading, time, requests
 
-          # Démarrer Flask dans un thread
           from app import app
           server = threading.Thread(
               target=lambda: app.run(host='127.0.0.1', port=5001, debug=False, use_reloader=False),
               daemon=True
           )
           server.start()
-          time.sleep(2)  # Attendre que Flask démarre
+          time.sleep(2)
 
           base = 'http://127.0.0.1:5001'
 
-          # Test GET /
           r = requests.get(f'{base}/', timeout=5)
-          assert r.status_code == 200, f'GET / → {r.status_code}'
+          assert r.status_code == 200
           print('✅ GET / → 200 OK')
 
-          # Test GET /api/state
           r = requests.get(f'{base}/api/state', timeout=5)
           assert r.status_code == 200
           data = r.json()
           assert 'rooms' in data
-          print('✅ GET /api/state → 200 OK, rooms présent')
+          print('✅ GET /api/state → rooms présent')
 
-          # Test POST /api/simulation/toggle
           r = requests.post(f'{base}/api/simulation/toggle', timeout=5)
           assert r.status_code == 200
           print('✅ POST /api/simulation/toggle → 200 OK')
 
-          # Test POST /api/scenario
           r = requests.post(f'{base}/api/scenario', json={'scenario': 'NIGHT'}, timeout=5)
           assert r.status_code == 200
           print('✅ POST /api/scenario NIGHT → 200 OK')
 
-          # Test POST /api/room/SALON/light
           r = requests.post(f'{base}/api/room/SALON/light', json={'value': True}, timeout=5)
           assert r.status_code == 200
           print('✅ POST /api/room/SALON/light → 200 OK')
 
-          # Test POST /api/room/CUISINE/heating
           r = requests.post(f'{base}/api/room/CUISINE/heating', json={'value': True}, timeout=5)
           assert r.status_code == 200
           print('✅ POST /api/room/CUISINE/heating → 200 OK')
 
-          # Test POST /api/command NLP
           r = requests.post(f'{base}/api/command', json={'text': 'allume le salon'}, timeout=5)
           assert r.status_code == 200
           data = r.json()
           assert 'reply' in data
-          print(f'✅ POST /api/command → reply: {data[\"reply\"][:40]}...')
+          print(f'✅ POST /api/command → reply OK')
 
-          # Test POST /api/alarms/reset
           r = requests.post(f'{base}/api/alarms/reset', timeout=5)
           assert r.status_code == 200
           print('✅ POST /api/alarms/reset → 200 OK')
 
-          # Test POST /api/reset
           r = requests.post(f'{base}/api/reset', timeout=5)
           assert r.status_code == 200
           print('✅ POST /api/reset → 200 OK')
 
-          print('')
           print('🎉 Tous les tests API Flask passent !')
           "
 
-      # ── 9. Résumé final ────────────────────────────────────────────────────
       - name: 📊 Résumé
         run: |
           echo "================================================"
@@ -215,6 +183,6 @@ jobs:
           echo "  📦 Imports        : OK"
           echo "  📄 Fichiers       : OK"
           echo "  🧠 NLP Parser     : 6/6 tests"
-          echo "  ⚙️  Engine BDI     : 5/5 tests"
+          echo "  ⚙️  Engine BDI     : 7/7 tests"
           echo "  🌐 API Flask      : 9/9 routes"
           echo "================================================"

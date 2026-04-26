@@ -2,7 +2,7 @@
 
 > **INF8790 — Fondements de l'Intelligence Artificielle**  
 > UQÀM — Universite du quebec a Montreal— Hiver 2026  
-> Équipe D : ·Mamadou Rafiou Barry  ·Awa Faye  · Naouel Ouazar  ·Mohamed Ketreb
+> Équipe D : Mamadou Rafiou Barry · Awa Faye · Naouel Ouazar · Mohamed Ketreb
 
 ---
 
